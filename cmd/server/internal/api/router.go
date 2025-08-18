@@ -5,11 +5,10 @@ package api
 import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"net/http"
 )
 
 // NewRouter initializes the HTTP router with default middlewares and base routes.
-func NewRouter() *chi.Mux {
+func NewRouter(a *API) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -17,10 +16,9 @@ func NewRouter() *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60e9)) // 1min
 
-	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
+	a.RegisterSystemRoutes(r)
+	a.RegisterAuthRoutes(r)
 
 	return r
 }
+
