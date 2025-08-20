@@ -11,14 +11,20 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/api"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/db"
 	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
-	"github.com/sleklere/realtime-chat/cmd/server/internal/user"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system env")
+	}
+
 	ctx := context.Background()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	pool, err := db.NewPool(ctx)
 	if err != nil {
@@ -26,26 +32,29 @@ func main() {
 	}
 	defer pool.Close()
 
-	queries := dbstore.New(pool)
-	usersSvc := user.NewService(queries)
-
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
-	a := &api.API{
-		Logger: logger,
-		Users: usersSvc,
+	err = pool.Ping(ctx)
+	if err != nil {
+		log.Fatalf("err pinging pool: %v", err)
 	}
 
-	addr := ":" +getenv("PORT", "8080")
+	queries := dbstore.New(pool)
+	authSvc := auth.NewService(queries, logger)
+
+	a := &api.API{
+		Logger:      logger,
+		AuthService: authSvc,
+	}
+
+	addr := ":" + getenv("PORT", "8080")
 
 	r := api.NewRouter(a)
 
 	srv := &http.Server{
-		Addr: addr,
-		Handler: r,
-		ReadTimeout: 10 * time.Second,
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
-		IdleTimeout: 10 * time.Second,
+		IdleTimeout:  10 * time.Second,
 	}
 
 	go func() {
@@ -54,7 +63,6 @@ func main() {
 			log.Fatalf("listen: %v", err)
 		}
 	}()
-
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
@@ -66,6 +74,8 @@ func main() {
 }
 
 func getenv(k, def string) string {
-	if v := os.Getenv(k); v != "" { return v }
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
 	return def
 }

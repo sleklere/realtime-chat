@@ -1,3 +1,5 @@
+// Package handlers provides the HTTP endpoint handlers for the API,
+// implementing business logic for authentication, system health, and more.
 package handlers
 
 import (
@@ -8,19 +10,22 @@ import (
 	"net/http"
 
 	reqdto "github.com/sleklere/realtime-chat/cmd/server/internal/api/dto/request"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/httpx"
-	"github.com/sleklere/realtime-chat/cmd/server/internal/user"
 )
 
+// AuthHandler handles authentication-related HTTP requests.
 type AuthHandler struct {
-	users *user.Service
-	logger *slog.Logger
+	authSvc *auth.Service
+	logger  *slog.Logger
 }
 
-func NewAuthHandler(users *user.Service, logger *slog.Logger) *AuthHandler {
-	return &AuthHandler{users: users, logger: logger}
+// NewAuthHandler creates a new AuthHandler with the given service and logger.
+func NewAuthHandler(s *auth.Service, l *slog.Logger) *AuthHandler {
+	return &AuthHandler{authSvc: s, logger: l}
 }
 
+// Register handles user registration requests, validates input, and returns a created user or an error.
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {
 	h.logger.Debug("register handler")
 
@@ -29,22 +34,22 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {
 		return httpx.BadRequest("invalid_json", "invalid json", err)
 	}
 
-	u, err := h.users.Register(context.Background(), req)
+	u, err := h.authSvc.Register(context.Background(), req)
 	if err != nil {
-		if errors.Is(err, user.ErrEmailTaken) {
+		if errors.Is(err, auth.ErrEmailTaken) {
 			return httpx.New(http.StatusConflict, "email_taken", "email already in use", err)
 		}
 		return err
 	}
 
 	return httpx.JSON(w, http.StatusCreated, map[string]any{
-		"id":u.ID, "email": u.Email, "created_at": u.CreatedAt,
+		"id": u.ID, "email": u.Email, "created_at": u.CreatedAt,
 	})
 
 }
 
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+// Login handles user login requests (not yet implemented).
+func (h *AuthHandler) Login(_ http.ResponseWriter, _ *http.Request) {
 	h.logger.Debug("login handler")
 
 }
-

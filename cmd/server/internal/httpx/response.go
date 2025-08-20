@@ -5,6 +5,8 @@ import (
 	"net/http"
 )
 
+// JSON writes the given value as a JSON response with the specified HTTP status.
+// If the status is 204 No Content, it only writes the header without a body.
 func JSON(w http.ResponseWriter, status int, v any) error {
 	if status == http.StatusNoContent {
 		w.WriteHeader(status)

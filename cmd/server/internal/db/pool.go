@@ -26,4 +26,3 @@ func Ping(ctx context.Context, p *pgxpool.Pool) error {
 	defer cancel()
 	return p.Ping(ctx)
 }
-
