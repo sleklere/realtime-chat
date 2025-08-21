@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE users (
   id            BIGSERIAL PRIMARY KEY,
-  email         TEXT UNIQUE NOT NULL,
+  username         TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );

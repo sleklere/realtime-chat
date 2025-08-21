@@ -10,40 +10,40 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password)
+INSERT INTO users (username, password)
 VALUES ($1, $2)
-RETURNING id, email, password, created_at
+RETURNING id, username, password, created_at
 `
 
 type CreateUserParams struct {
-	Email    string
+	Username string
 	Password string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Email, arg.Password)
+	row := q.db.QueryRow(ctx, createUser, arg.Username, arg.Password)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Email,
+		&i.Username,
 		&i.Password,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
-const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password, created_at
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, password, created_at
 FROM users
-WHERE email = $1
+WHERE username = $1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, email)
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByUsername, username)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Email,
+		&i.Username,
 		&i.Password,
 		&i.CreatedAt,
 	)

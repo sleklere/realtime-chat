@@ -1,9 +1,9 @@
 -- name: CreateUser :one
-INSERT INTO users (email, password)
+INSERT INTO users (username, password)
 VALUES ($1, $2)
-RETURNING id, email, password, created_at;
+RETURNING id, username, password, created_at;
 
--- name: GetUserByEmail :one
-SELECT id, email, password, created_at
+-- name: GetUserByUsername :one
+SELECT id, username, password, created_at
 FROM users
-WHERE email = $1;
+WHERE username = $1;

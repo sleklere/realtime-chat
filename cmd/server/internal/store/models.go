@@ -38,7 +38,7 @@ type RoomMember struct {
 
 type User struct {
 	ID        int64
-	Email     string
+	Username  string
 	Password  string
 	CreatedAt pgtype.Timestamptz
 }

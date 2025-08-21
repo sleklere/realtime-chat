@@ -14,7 +14,7 @@ import (
 
 // Store defines the persistence methods required for authentication operations.
 type Store interface {
-	GetUserByEmail(ctx context.Context, email string) (dbstore.User, error)
+	GetUserByUsername(ctx context.Context, email string) (dbstore.User, error)
 	CreateUser(ctx context.Context, arg dbstore.CreateUserParams) (dbstore.User, error)
 }
 
@@ -32,14 +32,15 @@ func NewService(s Store, l *slog.Logger) *Service {
 // ErrEmailTaken indicates that the email is already registered.
 // ErrInvalidCreds indicates that the provided credentials are invalid.
 var (
-	ErrEmailTaken   = errors.New("email already in use")
-	ErrInvalidCreds = errors.New("invalid credentials")
+	ErrUsernameTaken 	= errors.New("username already in use")
+	ErrInvalidCreds 	= errors.New("invalid credentials")
+	ErrUserNotFound 	= errors.New("user not found")
 )
 
 // Register creates a new user account, hashing the password and checking for duplicates.
 func (s *Service) Register(ctx context.Context, req reqdto.RegisterReq) (dbstore.User, error) {
-	if _, err := s.store.GetUserByEmail(ctx, req.Email); err == nil {
-		return dbstore.User{}, ErrEmailTaken
+	if _, err := s.store.GetUserByUsername(ctx, req.Username); err == nil {
+		return dbstore.User{}, ErrUsernameTaken
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -47,7 +48,22 @@ func (s *Service) Register(ctx context.Context, req reqdto.RegisterReq) (dbstore
 	}
 
 	return s.store.CreateUser(ctx, dbstore.CreateUserParams{
-		Email:    req.Email,
+		Username:    req.Username,
 		Password: string(hash),
 	})
+}
+
+// Login gets the user by it's username, checks if the password matches, and returns the user or an error
+func (s *Service) Login(ctx context.Context, req reqdto.LoginReq) (dbstore.User, error) {
+	u, err := s.store.GetUserByUsername(ctx, req.Username)
+	if err != nil {
+			return dbstore.User{}, ErrUserNotFound
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password))
+	if err != nil {
+		return dbstore.User{}, ErrInvalidCreds
+	}
+
+	return u, nil
 }

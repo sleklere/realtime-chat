@@ -23,7 +23,7 @@ func (a *API) RegisterAuthRoutes(r chi.Router) {
 	h := handlers.NewAuthHandler(a.AuthService, a.Logger)
 	r.Route("/auth", func(r chi.Router) {
 		r.Post("/register", a.Handle(h.Register))
-		// r.Post("/login", a.Handle(h.Login))
+		r.Post("/login", a.Handle(h.Login))
 	})
 }
 

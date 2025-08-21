@@ -5,8 +5,8 @@ import "net/http"
 // HTTPError represents a structured error that can be serialized as JSON in HTTP responses.
 type HTTPError struct {
 	Status  int    `json:"-"`
-	Code    string `json:"code,omitempty"`
-	Msg     string `json:"error"`
+	Code   string `json:"code,omitempty"`
+	Msg   string `json:"error"`
 	Details any    `json:"details,omitempty"`
 	Err     error  `json:"-"`
 }
