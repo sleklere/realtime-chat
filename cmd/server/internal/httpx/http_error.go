@@ -1,12 +1,15 @@
 package httpx
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 // HTTPError represents a structured error that can be serialized as JSON in HTTP responses.
 type HTTPError struct {
 	Status  int    `json:"-"`
-	Code   string `json:"code,omitempty"`
-	Msg   string `json:"error"`
+	Code    string `json:"code,omitempty"`
+	Msg     string `json:"error"`
 	Details any    `json:"details,omitempty"`
 	Err     error  `json:"-"`
 }
@@ -16,6 +19,7 @@ func (e *HTTPError) Error() string { return e.Msg }
 
 // New creates a new HTTPError with the given status, code, message, and underlying error.
 func New(status int, code, msg string, err error) *HTTPError {
+	log.Default().Print("call to http.New")
 	return &HTTPError{Status: status, Code: code, Msg: msg, Err: err}
 }
 

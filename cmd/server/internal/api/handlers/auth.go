@@ -9,7 +9,6 @@ import (
 	"net/http"
 
 	reqdto "github.com/sleklere/realtime-chat/cmd/server/internal/api/dto/request"
-	resdto "github.com/sleklere/realtime-chat/cmd/server/internal/api/dto/response"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/httpx"
 )
@@ -34,7 +33,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {
 		return httpx.BadRequest("invalid_json", "invalid json", err)
 	}
 
-	u, err := h.authSvc.Register(r.Context(), req)
+	authRes, err := h.authSvc.Register(r.Context(), req)
 	if err != nil {
 		if errors.Is(err, auth.ErrUsernameTaken) {
 			return httpx.New(http.StatusConflict, "username_taken", "username already in use", err)
@@ -42,11 +41,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	return httpx.JSON(w, http.StatusOK, resdto.UserRes{
-		ID:        u.ID,
-		Username:  u.Username,
-		CreatedAt: u.CreatedAt.Time,
-	})
+	return httpx.JSON(w, http.StatusOK, authRes)
 }
 
 // Login handles user login requests (not yet implemented).
@@ -58,14 +53,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) error {
 		return httpx.BadRequest("invalid_json", "invalid json", err)
 	}
 
-	u, err := h.authSvc.Login(r.Context(), req)
+	authRes, err := h.authSvc.Login(r.Context(), req)
 	if err != nil {
 		return err
 	}
 
-	return httpx.JSON(w, http.StatusOK, resdto.UserRes{
-		ID:        u.ID,
-		Username:  u.Username,
-		CreatedAt: u.CreatedAt.Time,
-	})
+	return httpx.JSON(w, http.StatusOK, authRes)
 }

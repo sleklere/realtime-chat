@@ -37,12 +37,18 @@ func main() {
 		log.Fatalf("err pinging pool: %v", err)
 	}
 
+	authCfg := &auth.Config{
+		JWTSecret: []byte(getenv("JWT_SECRET", "default_secret")),
+		Issuer:    "realtime-chat",
+		AccessTTL: 15 * time.Minute,
+	}
 	queries := dbstore.New(pool)
-	authSvc := auth.NewService(queries, logger)
+	authSvc := auth.NewService(queries, logger, authCfg)
 
 	a := &api.API{
 		Logger:      logger,
 		AuthService: authSvc,
+		AuthConfig:  authCfg,
 	}
 
 	addr := ":" + getenv("PORT", "8080")

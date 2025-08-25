@@ -16,10 +16,10 @@ func NewRouter(a *API) *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60e9)) // 1min
 
-	a.RegisterSystemRoutes(r)
+	a.registerSystemRoutes(r)
 
 	r.Route("/api/v1", func(api chi.Router) {
-		a.RegisterAuthRoutes(api)
+		a.registerAuthRoutes(api)
 	})
 
 	return r
