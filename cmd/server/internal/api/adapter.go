@@ -50,7 +50,8 @@ func (a *API) validateJWT(next http.Handler) http.Handler {
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		ctx := auth.NewClaimsContext(r.Context(), &claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

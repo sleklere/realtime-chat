@@ -49,6 +49,7 @@ func main() {
 		Logger:      logger,
 		AuthService: authSvc,
 		AuthConfig:  authCfg,
+		Queries:     queries,
 	}
 
 	addr := ":" + getenv("PORT", "8080")

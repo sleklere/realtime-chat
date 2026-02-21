@@ -32,6 +32,42 @@ func (q *Queries) CreateRoom(ctx context.Context, arg CreateRoomParams) (Room, e
 	return i, err
 }
 
+const getRoomByID = `-- name: GetRoomByID :one
+SELECT id, name, slug, created_at
+FROM rooms
+WHERE id = $1
+`
+
+func (q *Queries) GetRoomByID(ctx context.Context, id int64) (Room, error) {
+	row := q.db.QueryRow(ctx, getRoomByID, id)
+	var i Room
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getRoomBySlug = `-- name: GetRoomBySlug :one
+SELECT id, name, slug, created_at
+FROM rooms
+WHERE slug = $1
+`
+
+func (q *Queries) GetRoomBySlug(ctx context.Context, slug string) (Room, error) {
+	row := q.db.QueryRow(ctx, getRoomBySlug, slug)
+	var i Room
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const listRooms = `-- name: ListRooms :many
 SELECT id, name, slug, created_at
 FROM rooms

@@ -7,3 +7,13 @@ RETURNING id, name, slug, created_at;
 SELECT id, name, slug, created_at
 FROM rooms
 ORDER BY created_at DESC;
+
+-- name: GetRoomBySlug :one
+SELECT id, name, slug, created_at
+FROM rooms
+WHERE slug = $1;
+
+-- name: GetRoomByID :one
+SELECT id, name, slug, created_at
+FROM rooms
+WHERE id = $1;
