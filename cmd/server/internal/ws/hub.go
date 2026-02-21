@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"log/slog"
+
 	"github.com/coder/websocket"
 )
 
@@ -12,6 +14,8 @@ type Client struct {
 	username string
 	roomIDs  map[int64]bool // rooms this client is a member of
 	send     chan Message   // Hub writes here, WritePump drains
+
+	logger *slog.Logger
 }
 
 // Hub is the central message broker.
