@@ -9,9 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	reqdto "github.com/sleklere/realtime-chat/cmd/server/internal/api/dto/request"
 	resdto "github.com/sleklere/realtime-chat/cmd/server/internal/api/dto/response"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/httpx"
 	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
 )
