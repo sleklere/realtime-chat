@@ -1,7 +1,7 @@
--- name: JoinRoom :one
+-- name: JoinRoom :exec
 INSERT INTO room_members (room_id, user_id)
 VALUES ($1, $2)
-RETURNING room_id, user_id, joined_at;
+ON CONFLICT DO NOTHING;
 
 -- name: LeaveRoom :exec
 DELETE FROM room_members

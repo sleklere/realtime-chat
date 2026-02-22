@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// WebSocket message types.
 const (
 	TypeRoomMessage   = "room_message"
 	TypeDirectMessage = "direct_message"

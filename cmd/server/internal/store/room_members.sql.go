@@ -61,10 +61,10 @@ func (q *Queries) IsMember(ctx context.Context, arg IsMemberParams) (bool, error
 	return is_member, err
 }
 
-const joinRoom = `-- name: JoinRoom :one
+const joinRoom = `-- name: JoinRoom :exec
 INSERT INTO room_members (room_id, user_id)
 VALUES ($1, $2)
-RETURNING room_id, user_id, joined_at
+ON CONFLICT DO NOTHING
 `
 
 type JoinRoomParams struct {
@@ -72,11 +72,9 @@ type JoinRoomParams struct {
 	UserID int64
 }
 
-func (q *Queries) JoinRoom(ctx context.Context, arg JoinRoomParams) (RoomMember, error) {
-	row := q.db.QueryRow(ctx, joinRoom, arg.RoomID, arg.UserID)
-	var i RoomMember
-	err := row.Scan(&i.RoomID, &i.UserID, &i.JoinedAt)
-	return i, err
+func (q *Queries) JoinRoom(ctx context.Context, arg JoinRoomParams) error {
+	_, err := q.db.Exec(ctx, joinRoom, arg.RoomID, arg.UserID)
+	return err
 }
 
 const leaveRoom = `-- name: LeaveRoom :exec

@@ -16,6 +16,7 @@ import (
 	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/db"
 	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/ws"
 )
 
 func main() {
@@ -24,7 +25,12 @@ func main() {
 	}
 
 	ctx := context.Background()
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	options := &slog.HandlerOptions{
+		// Set the minimum level to Debug; logs below this (like Trace if defined) will be ignored.
+		Level: slog.LevelDebug,
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, options))
 
 	pool, err := db.NewPool(ctx)
 	if err != nil {
@@ -44,12 +50,15 @@ func main() {
 	}
 	queries := dbstore.New(pool)
 	authSvc := auth.NewService(queries, logger, authCfg)
+	hub := ws.NewHub()
+	go hub.Run()
 
 	a := &api.API{
 		Logger:      logger,
 		AuthService: authSvc,
 		AuthConfig:  authCfg,
 		Queries:     queries,
+		Hub:         hub,
 	}
 
 	addr := ":" + getenv("PORT", "8080")

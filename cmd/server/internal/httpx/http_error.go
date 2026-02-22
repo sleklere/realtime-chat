@@ -1,7 +1,6 @@
 package httpx
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -19,7 +18,6 @@ func (e *HTTPError) Error() string { return e.Msg }
 
 // New creates a new HTTPError with the given status, code, message, and underlying error.
 func New(status int, code, msg string, err error) *HTTPError {
-	log.Default().Print("call to http.New")
 	return &HTTPError{Status: status, Code: code, Msg: msg, Err: err}
 }
 

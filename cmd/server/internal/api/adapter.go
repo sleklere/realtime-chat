@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/httpx"
 )
@@ -35,22 +34,14 @@ func (a *API) validateJWT(next http.Handler) http.Handler {
 		}
 		tokenStr := strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
 
-		var claims auth.Claims
-		cfg := a.AuthConfig
-
-		tok, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (any, error) {
-			if t.Method != jwt.SigningMethodHS256 {
-				return nil, errors.New("invalid algo")
-			}
-			return cfg.JWTSecret, nil
-		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
-		if err != nil || !tok.Valid || claims.Issuer != cfg.Issuer {
-			err := httpx.New(http.StatusUnauthorized, "invalid_token", "invalid bearer token", errors.New("invalid bearer token"))
-			a.writeError(w, r, err)
+		claims, err := auth.ParseToken(tokenStr, a.AuthConfig)
+		if err != nil {
+			herr := httpx.New(http.StatusUnauthorized, "invalid_token", "invalid bearer token", err)
+			a.writeError(w, r, herr)
 			return
 		}
 
-		ctx := auth.NewClaimsContext(r.Context(), &claims)
+		ctx := auth.NewClaimsContext(r.Context(), claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

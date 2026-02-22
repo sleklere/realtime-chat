@@ -111,7 +111,7 @@ func (h *RoomHandler) Join(w http.ResponseWriter, r *http.Request) error {
 		return httpx.BadRequest("invalid_room_id", "invalid room id", err)
 	}
 
-	_, err = h.queries.JoinRoom(r.Context(), dbstore.JoinRoomParams{
+	err = h.queries.JoinRoom(r.Context(), dbstore.JoinRoomParams{
 		RoomID: roomID,
 		UserID: claims.UserID,
 	})

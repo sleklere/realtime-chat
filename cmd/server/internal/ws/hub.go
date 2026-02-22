@@ -36,6 +36,7 @@ type BroadcastMsg struct {
 	targetUserIDs []int64 // if targetRoomID == 0, route to these users (DM)
 }
 
+// NewHub creates a Hub with initialized maps and channels.
 func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[int64]*Client),
@@ -46,36 +47,37 @@ func NewHub() *Hub {
 	}
 }
 
+// Run starts the Hub event loop. Must be called in a goroutine.
 func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
-			for roomId, isInRoom := range client.roomIDs {
-				_, ok := h.rooms[roomId]
+			for roomID, isInRoom := range client.roomIDs {
+				_, ok := h.rooms[roomID]
 				if !ok {
-					h.rooms[roomId] = make(map[int64]bool)
+					h.rooms[roomID] = make(map[int64]bool)
 				}
-				h.rooms[roomId][client.userID] = isInRoom
+				h.rooms[roomID][client.userID] = isInRoom
 			}
 			h.clients[client.userID] = client
 		case client := <-h.unregister:
-			for roomId := range client.roomIDs {
-				_, ok := h.rooms[roomId]
+			for roomID := range client.roomIDs {
+				_, ok := h.rooms[roomID]
 				if !ok {
 					continue
 				}
-				delete(h.rooms[roomId], client.userID)
+				delete(h.rooms[roomID], client.userID)
 			}
 			delete(h.clients, client.userID)
 			close(client.send)
 		case broadcastMsg := <-h.broadcast:
 			// if it's a room msg
 			if broadcastMsg.targetRoomID > 0 {
-				for userId, isConnected := range h.rooms[broadcastMsg.targetRoomID] {
+				for userID, isConnected := range h.rooms[broadcastMsg.targetRoomID] {
 					if !isConnected {
 						continue
 					}
-					c := h.clients[userId]
+					c := h.clients[userID]
 					select {
 					case c.send <- broadcastMsg.msg:
 					default:
@@ -84,9 +86,9 @@ func (h *Hub) Run() {
 					}
 				}
 			} else {
-				for _, userId := range broadcastMsg.targetUserIDs {
+				for _, userID := range broadcastMsg.targetUserIDs {
 					// if the client exists
-					if c, ok := h.clients[userId]; ok {
+					if c, ok := h.clients[userID]; ok {
 						select {
 						case c.send <- broadcastMsg.msg:
 						default:
@@ -104,11 +106,16 @@ func (h *Hub) Run() {
 func (h *Hub) kickClient(c *Client) {
 	close(c.send)
 	delete(h.clients, c.userID)
-	for roomId := range c.roomIDs {
-		_, ok := h.rooms[roomId]
+	for roomID := range c.roomIDs {
+		_, ok := h.rooms[roomID]
 		if !ok {
 			continue
 		}
-		delete(h.rooms[roomId], c.userID)
+		delete(h.rooms[roomID], c.userID)
 	}
+}
+
+// Register sends a client to the Hub's register channel.
+func (h *Hub) Register(c *Client) {
+	h.register <- c
 }

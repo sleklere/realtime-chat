@@ -1,0 +1,73 @@
+package handlers
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"strings"
+
+	"github.com/coder/websocket"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/httpx"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/store"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/ws"
+)
+
+// WSHandler handles WebSocket upgrade requests.
+type WSHandler struct {
+	hub        *ws.Hub
+	queries    *store.Queries
+	authConfig *auth.Config
+	logger     *slog.Logger
+}
+
+// NewWSHandler creates a new WSHandler.
+func NewWSHandler(hub *ws.Hub, queries *store.Queries, authConfig *auth.Config, logger *slog.Logger) *WSHandler {
+	return &WSHandler{hub: hub, queries: queries, authConfig: authConfig, logger: logger}
+}
+
+// Upgrade handles the HTTP→WebSocket upgrade, authenticates via query param token, and starts the client pumps.
+func (h *WSHandler) Upgrade(w http.ResponseWriter, r *http.Request) error {
+	tokenQueryParam := r.URL.Query().Get("token")
+	tokenHeader := r.Header.Get("Authorization")
+	h.logger.Debug("token(query)", "tokenQueryParam", tokenQueryParam)
+	h.logger.Debug("token(header)", "tokenHeader", tokenHeader)
+	if tokenQueryParam == "" && tokenHeader == "" {
+		return httpx.New(http.StatusUnauthorized, "missing_token", "missing token", errors.New("missing token"))
+	}
+
+	token := tokenQueryParam
+	if tokenQueryParam == "" {
+		token = strings.ReplaceAll(tokenHeader, "Bearer ", "")
+	}
+
+	claims, err := auth.ParseToken(token, h.authConfig)
+	if err != nil {
+		return httpx.New(http.StatusUnauthorized, "invalid_token", "invalid token", err)
+	}
+
+	// important to fetch rooms before accepting ws
+	rooms, err := h.queries.GetRoomsForUser(r.Context(), claims.UserID)
+	if err != nil {
+		return httpx.New(http.StatusInternalServerError, "rooms_error", "error fetching user rooms", err)
+	}
+
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{})
+	if err != nil {
+		return httpx.New(http.StatusInternalServerError, "upgrade_error", "error upgrading handshake to ws conn", err)
+	}
+
+	roomIDs := make(map[int64]bool)
+	for _, room := range rooms {
+		roomIDs[room.ID] = true
+	}
+
+	client := ws.NewClient(h.hub, conn, claims.UserID, claims.Username, roomIDs, h.logger)
+	h.hub.Register(client)
+
+	go client.WritePump(context.Background())
+	client.ReadPump(context.Background())
+
+	return nil
+}

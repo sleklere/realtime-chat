@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -32,4 +33,22 @@ type Claims struct {
 	UserID   int64  `json:"uid"`
 	Username string `json:"un"`
 	jwt.RegisteredClaims
+}
+
+// ParseToken validates a raw JWT string and returns the embedded claims.
+func ParseToken(tokenStr string, cfg *Config) (*Claims, error) {
+	var claims Claims
+	tok, err := jwt.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (any, error) {
+		if t.Method != jwt.SigningMethodHS256 {
+			return nil, errors.New("invalid algo")
+		}
+		return cfg.JWTSecret, nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	if err != nil {
+		return nil, err
+	}
+	if !tok.Valid || claims.Issuer != cfg.Issuer {
+		return nil, errors.New("invalid token")
+	}
+	return &claims, nil
 }

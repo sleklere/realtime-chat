@@ -9,6 +9,7 @@ import (
 	"github.com/sleklere/realtime-chat/cmd/server/internal/api/handlers"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/ws"
 )
 
 // API defines the HTTP API layer with logger and services used by handlers
@@ -17,6 +18,7 @@ type API struct {
 	AuthService *auth.Service
 	AuthConfig  *auth.Config
 	Queries     *dbstore.Queries
+	Hub         *ws.Hub
 }
 
 // RegisterAuthRoutes registers all authentication-related endpoints under /auth
