@@ -6,6 +6,8 @@ import (
 	"log/slog"
 
 	"github.com/coder/websocket"
+	"github.com/jackc/pgx/v5/pgtype"
+	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
 )
 
 // ReadPump reads messages from the WebSocket and routes them to the Hub.
@@ -45,9 +47,21 @@ func (c *Client) ReadPump(ctx context.Context) {
 				c.logger.Warn("failed TypeRoomMessage validation", "room_id", roomMsgPayload.RoomID)
 				continue
 			}
-			//    - armar el BroadcastMsg y mandarlo a c.hub.broadcast
+			//    - persist to DB and broadcast
 			roomMsgPayload.SenderID = c.userID
 			roomMsgPayload.SenderUsername = c.username
+
+			dbMsg, err := c.queries.CreateMessage(ctx, dbstore.CreateMessageParams{
+				RoomID:   pgtype.Int8{Int64: roomMsgPayload.RoomID, Valid: true},
+				SenderID: c.userID,
+				Body:     roomMsgPayload.Content,
+			})
+			if err != nil {
+				c.logger.Warn("failed to persist room message", "error", err)
+			} else {
+				roomMsgPayload.MessageID = dbMsg.ID
+			}
+
 			completePayload, err := json.Marshal(roomMsgPayload)
 			if err != nil {
 				c.logger.Warn("error while marshalling complete msg payload")
@@ -87,10 +101,11 @@ func (c *Client) WritePump(ctx context.Context) {
 }
 
 // NewClient creates a new Client ready to be registered with the Hub.
-func NewClient(hub *Hub, conn *websocket.Conn, userID int64, username string, roomIDs map[int64]bool, logger *slog.Logger) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, queries *dbstore.Queries, userID int64, username string, roomIDs map[int64]bool, logger *slog.Logger) *Client {
 	return &Client{
 		hub:      hub,
 		conn:     conn,
+		queries:  queries,
 		userID:   userID,
 		username: username,
 		roomIDs:  roomIDs,

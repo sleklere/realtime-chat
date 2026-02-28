@@ -31,8 +31,6 @@ func NewWSHandler(hub *ws.Hub, queries *store.Queries, authConfig *auth.Config, 
 func (h *WSHandler) Upgrade(w http.ResponseWriter, r *http.Request) error {
 	tokenQueryParam := r.URL.Query().Get("token")
 	tokenHeader := r.Header.Get("Authorization")
-	h.logger.Debug("token(query)", "tokenQueryParam", tokenQueryParam)
-	h.logger.Debug("token(header)", "tokenHeader", tokenHeader)
 	if tokenQueryParam == "" && tokenHeader == "" {
 		return httpx.New(http.StatusUnauthorized, "missing_token", "missing token", errors.New("missing token"))
 	}
@@ -63,7 +61,7 @@ func (h *WSHandler) Upgrade(w http.ResponseWriter, r *http.Request) error {
 		roomIDs[room.ID] = true
 	}
 
-	client := ws.NewClient(h.hub, conn, claims.UserID, claims.Username, roomIDs, h.logger)
+	client := ws.NewClient(h.hub, conn, h.queries, claims.UserID, claims.Username, roomIDs, h.logger)
 	h.hub.Register(client)
 
 	go client.WritePump(context.Background())

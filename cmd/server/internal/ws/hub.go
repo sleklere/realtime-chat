@@ -4,12 +4,14 @@ import (
 	"log/slog"
 
 	"github.com/coder/websocket"
+	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
 )
 
 // Client represents a single WebSocket connection.
 type Client struct {
 	hub      *Hub
 	conn     *websocket.Conn
+	queries  *dbstore.Queries
 	userID   int64
 	username string
 	roomIDs  map[int64]bool // rooms this client is a member of
