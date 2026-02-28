@@ -32,11 +32,12 @@ type RoomResponse struct {
 
 // MessageResponse represents a message in API responses.
 type MessageResponse struct {
-	ID        int64     `json:"id"`
-	RoomID    *int64    `json:"room_id,omitempty"`
-	SenderID  int64     `json:"sender_id"`
-	Body      string    `json:"body"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             int64     `json:"id"`
+	RoomID         *int64    `json:"room_id,omitempty"`
+	SenderID       int64     `json:"sender_id"`
+	SenderUsername string    `json:"sender_username"`
+	Body           string    `json:"body"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // CreateRoomRequest represents the request body for creating a room.

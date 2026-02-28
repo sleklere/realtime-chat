@@ -171,10 +171,11 @@ func (h *RoomHandler) Messages(w http.ResponseWriter, r *http.Request) error {
 	res := make([]resdto.MessageRes, len(msgs))
 	for i, m := range msgs {
 		res[i] = resdto.MessageRes{
-			ID:        m.ID,
-			SenderID:  m.SenderID,
-			Body:      m.Body,
-			CreatedAt: m.CreatedAt.Time,
+			ID:             m.ID,
+			SenderID:       m.SenderID,
+			SenderUsername: m.SenderUsername,
+			Body:           m.Body,
+			CreatedAt:      m.CreatedAt.Time,
 		}
 		if m.RoomID.Valid {
 			res[i].RoomID = &m.RoomID.Int64

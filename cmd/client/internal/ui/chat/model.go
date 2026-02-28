@@ -111,10 +111,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case historyLoadedMsg:
-		for _, m2 := range msg.messages {
+		// Messages come from the API in DESC order (newest first), reverse for display.
+		for i := len(msg.messages) - 1; i >= 0; i-- {
+			m2 := msg.messages[i]
 			m.messages = append(m.messages, chatMessage{
 				senderID:       m2.SenderID,
-				senderUsername: fmt.Sprintf("user_%d", m2.SenderID),
+				senderUsername: m2.SenderUsername,
 				content:        m2.Body,
 				timestamp:      m2.CreatedAt.Format("15:04"),
 			})

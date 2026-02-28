@@ -84,10 +84,11 @@ func (q *Queries) ListMessagesByConversation(ctx context.Context, arg ListMessag
 }
 
 const listMessagesByRoom = `-- name: ListMessagesByRoom :many
-SELECT id, room_id, conversation_id, sender_id, body, created_at
-FROM messages
-WHERE room_id = $1
-ORDER BY created_at DESC
+SELECT m.id, m.room_id, m.conversation_id, m.sender_id, u.username AS sender_username, m.body, m.created_at
+FROM messages m
+JOIN users u ON u.id = m.sender_id
+WHERE m.room_id = $1
+ORDER BY m.created_at DESC
 LIMIT $2
 `
 
@@ -96,20 +97,31 @@ type ListMessagesByRoomParams struct {
 	Limit  int32
 }
 
-func (q *Queries) ListMessagesByRoom(ctx context.Context, arg ListMessagesByRoomParams) ([]Message, error) {
+type ListMessagesByRoomRow struct {
+	ID             int64
+	RoomID         pgtype.Int8
+	ConversationID pgtype.Int8
+	SenderID       int64
+	SenderUsername string
+	Body           string
+	CreatedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) ListMessagesByRoom(ctx context.Context, arg ListMessagesByRoomParams) ([]ListMessagesByRoomRow, error) {
 	rows, err := q.db.Query(ctx, listMessagesByRoom, arg.RoomID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Message
+	var items []ListMessagesByRoomRow
 	for rows.Next() {
-		var i Message
+		var i ListMessagesByRoomRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.RoomID,
 			&i.ConversationID,
 			&i.SenderID,
+			&i.SenderUsername,
 			&i.Body,
 			&i.CreatedAt,
 		); err != nil {
