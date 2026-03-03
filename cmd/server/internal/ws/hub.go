@@ -26,9 +26,10 @@ type Hub struct {
 	clients map[int64]*Client        // userID → client
 	rooms   map[int64]map[int64]bool // roomID → set of userIDs online
 
-	register   chan *Client
-	unregister chan *Client
-	broadcast  chan BroadcastMsg
+	register       chan *Client
+	unregister     chan *Client
+	broadcast      chan BroadcastMsg
+	userRoomUpdate chan UserRoomPresent
 }
 
 // BroadcastMsg wraps a message with routing info.
@@ -38,14 +39,21 @@ type BroadcastMsg struct {
 	targetUserIDs []int64 // if targetRoomID == 0, route to these users (DM)
 }
 
+type UserRoomPresent struct {
+	userID  int64
+	roomID  int64
+	present bool
+}
+
 // NewHub creates a Hub with initialized maps and channels.
 func NewHub() *Hub {
 	return &Hub{
-		clients:    make(map[int64]*Client),
-		rooms:      make(map[int64]map[int64]bool),
-		register:   make(chan *Client),
-		unregister: make(chan *Client),
-		broadcast:  make(chan BroadcastMsg, 256),
+		clients:        make(map[int64]*Client),
+		rooms:          make(map[int64]map[int64]bool),
+		register:       make(chan *Client),
+		unregister:     make(chan *Client),
+		broadcast:      make(chan BroadcastMsg, 256),
+		userRoomUpdate: make(chan UserRoomPresent),
 	}
 }
 
@@ -72,6 +80,27 @@ func (h *Hub) Run() {
 			}
 			delete(h.clients, client.userID)
 			close(client.send)
+		case userRoomUpdate := <-h.userRoomUpdate:
+			if userRoomUpdate.present {
+				// update rooms in hub
+				_, ok := h.rooms[userRoomUpdate.roomID]
+				if !ok {
+					h.rooms[userRoomUpdate.roomID] = make(map[int64]bool)
+				}
+				h.rooms[userRoomUpdate.roomID][userRoomUpdate.userID] = true
+				// update rooms in client
+				client := h.clients[userRoomUpdate.userID]
+				client.roomIDs[userRoomUpdate.roomID] = true
+			} else {
+				// update rooms in hub
+				_, ok := h.rooms[userRoomUpdate.roomID]
+				if !ok {
+					continue
+				}
+				delete(h.rooms, userRoomUpdate.roomID)
+				client := h.clients[userRoomUpdate.userID]
+				delete(client.roomIDs, userRoomUpdate.roomID)
+			}
 		case broadcastMsg := <-h.broadcast:
 			// if it's a room msg
 			if broadcastMsg.targetRoomID > 0 {
@@ -120,4 +149,12 @@ func (h *Hub) kickClient(c *Client) {
 // Register sends a client to the Hub's register channel.
 func (h *Hub) Register(c *Client) {
 	h.register <- c
+}
+
+func (h *Hub) UpdateUserRoomState(roomID int64, userID int64, present bool) {
+	h.userRoomUpdate <- UserRoomPresent{
+		roomID:  roomID,
+		userID:  userID,
+		present: present,
+	}
 }

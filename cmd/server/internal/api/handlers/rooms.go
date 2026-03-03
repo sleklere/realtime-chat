@@ -14,6 +14,7 @@ import (
 	"github.com/sleklere/realtime-chat/cmd/server/internal/auth"
 	"github.com/sleklere/realtime-chat/cmd/server/internal/httpx"
 	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
+	"github.com/sleklere/realtime-chat/cmd/server/internal/ws"
 )
 
 const (
@@ -25,11 +26,12 @@ const (
 type RoomHandler struct {
 	queries *dbstore.Queries
 	logger  *slog.Logger
+	hub     *ws.Hub
 }
 
 // NewRoomHandler creates a new RoomHandler with the given queries and logger.
-func NewRoomHandler(q *dbstore.Queries, l *slog.Logger) *RoomHandler {
-	return &RoomHandler{queries: q, logger: l}
+func NewRoomHandler(q *dbstore.Queries, l *slog.Logger, h *ws.Hub) *RoomHandler {
+	return &RoomHandler{queries: q, logger: l, hub: h}
 }
 
 // Create handles room creation requests.
@@ -119,6 +121,8 @@ func (h *RoomHandler) Join(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
+	h.hub.UpdateUserRoomState(roomID, claims.UserID, true)
+
 	return httpx.JSON(w, http.StatusNoContent, nil)
 }
 
@@ -141,6 +145,8 @@ func (h *RoomHandler) Leave(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+
+	h.hub.UpdateUserRoomState(roomID, claims.UserID, false)
 
 	return httpx.JSON(w, http.StatusNoContent, nil)
 }

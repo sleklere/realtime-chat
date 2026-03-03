@@ -32,7 +32,7 @@ func (a *API) registerAuthRoutes(r chi.Router) {
 
 // registerRoomRoutes registers all room-related endpoints under /rooms
 func (a *API) registerRoomRoutes(r chi.Router) {
-	h := handlers.NewRoomHandler(a.Queries, a.Logger)
+	h := handlers.NewRoomHandler(a.Queries, a.Logger, a.Hub)
 	r.Route("/rooms", func(r chi.Router) {
 		r.Post("/", a.handle(h.Create))
 		r.Get("/", a.handle(h.List))
