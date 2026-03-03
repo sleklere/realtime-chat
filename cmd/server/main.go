@@ -43,8 +43,13 @@ func main() {
 		log.Fatalf("err pinging pool: %v", err)
 	}
 
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is required")
+	}
+
 	authCfg := &auth.Config{
-		JWTSecret: []byte(getenv("JWT_SECRET", "default_secret")),
+		JWTSecret: []byte(jwtSecret),
 		Issuer:    "realtime-chat",
 		AccessTTL: 15 * time.Minute,
 	}

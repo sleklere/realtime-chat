@@ -1,0 +1,6 @@
+.git
+.env
+client/
+client.log
+*.exe
+.claude/
