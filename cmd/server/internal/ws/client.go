@@ -31,47 +31,7 @@ func (c *Client) ReadPump(ctx context.Context) {
 			continue
 		}
 		// 3. switch msg.Type — por ahora solo manejá TypeRoomMessage
-		switch msg.Type {
-		case TypeRoomMessage:
-			//    - parsear el RoomMessagePayload del msg.Payload
-			var roomMsgPayload RoomMessagePayload
-			err = json.Unmarshal(msg.Payload, &roomMsgPayload)
-			if err != nil {
-				c.logger.Warn("error while unmarshalling msg payload")
-				continue
-			}
-			//    - validar (roomID > 0, content no vacío, que el client sea miembro del room)
-			_, clientInRoom := c.roomIDs[roomMsgPayload.RoomID]
-			if roomMsgPayload.RoomID == 0 || roomMsgPayload.Content == "" ||
-				!clientInRoom {
-				c.logger.Warn("failed TypeRoomMessage validation", "room_id", roomMsgPayload.RoomID)
-				continue
-			}
-			//    - persist to DB and broadcast
-			roomMsgPayload.SenderID = c.userID
-			roomMsgPayload.SenderUsername = c.username
-
-			dbMsg, err := c.queries.CreateMessage(ctx, dbstore.CreateMessageParams{
-				RoomID:   pgtype.Int8{Int64: roomMsgPayload.RoomID, Valid: true},
-				SenderID: c.userID,
-				Body:     roomMsgPayload.Content,
-			})
-			if err != nil {
-				c.logger.Warn("failed to persist room message", "error", err)
-			} else {
-				roomMsgPayload.MessageID = dbMsg.ID
-			}
-
-			completePayload, err := json.Marshal(roomMsgPayload)
-			if err != nil {
-				c.logger.Warn("error while marshalling complete msg payload")
-				continue
-			}
-			msgWithCompletePayload := Message{Type: msg.Type, Payload: completePayload, Timestamp: msg.Timestamp}
-
-			broadcastMsg := BroadcastMsg{msg: msgWithCompletePayload, targetRoomID: roomMsgPayload.RoomID}
-			c.hub.broadcast <- broadcastMsg
-		}
+		c.dispatchWSMessage(msg, ctx)
 	}
 }
 
@@ -97,6 +57,50 @@ func (c *Client) WritePump(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+func (c *Client) dispatchWSMessage(msg Message, ctx context.Context) {
+	switch msg.Type {
+	case TypeRoomMessage:
+		//    - parsear el RoomMessagePayload del msg.Payload
+		var roomMsgPayload RoomMessagePayload
+		err := json.Unmarshal(msg.Payload, &roomMsgPayload)
+		if err != nil {
+			c.logger.Warn("error while unmarshalling msg payload")
+			return
+		}
+		//    - validar (roomID > 0, content no vacío, que el client sea miembro del room)
+		_, clientInRoom := c.roomIDs[roomMsgPayload.RoomID]
+		if roomMsgPayload.RoomID == 0 || roomMsgPayload.Content == "" ||
+			!clientInRoom {
+			c.logger.Warn("failed TypeRoomMessage validation", "room_id", roomMsgPayload.RoomID)
+			return
+		}
+		//    - persist to DB and broadcast
+		roomMsgPayload.SenderID = c.userID
+		roomMsgPayload.SenderUsername = c.username
+
+		dbMsg, err := c.queries.CreateMessage(ctx, dbstore.CreateMessageParams{
+			RoomID:   pgtype.Int8{Int64: roomMsgPayload.RoomID, Valid: true},
+			SenderID: c.userID,
+			Body:     roomMsgPayload.Content,
+		})
+		if err != nil {
+			c.logger.Warn("failed to persist room message", "error", err)
+		} else {
+			roomMsgPayload.MessageID = dbMsg.ID
+		}
+
+		completePayload, err := json.Marshal(roomMsgPayload)
+		if err != nil {
+			c.logger.Warn("error while marshalling complete msg payload")
+			return
+		}
+		msgWithCompletePayload := Message{Type: msg.Type, Payload: completePayload, Timestamp: msg.Timestamp}
+
+		broadcastMsg := BroadcastMsg{msg: msgWithCompletePayload, targetRoomID: roomMsgPayload.RoomID}
+		c.hub.broadcast <- broadcastMsg
 	}
 }
 

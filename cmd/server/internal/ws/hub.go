@@ -81,24 +81,21 @@ func (h *Hub) Run() {
 			delete(h.clients, client.userID)
 			close(client.send)
 		case userRoomUpdate := <-h.userRoomUpdate:
+			client, ok := h.clients[userRoomUpdate.userID]
+			if !ok {
+				continue
+			}
 			if userRoomUpdate.present {
-				// update rooms in hub
-				_, ok := h.rooms[userRoomUpdate.roomID]
-				if !ok {
+				if _, ok := h.rooms[userRoomUpdate.roomID]; !ok {
 					h.rooms[userRoomUpdate.roomID] = make(map[int64]bool)
 				}
 				h.rooms[userRoomUpdate.roomID][userRoomUpdate.userID] = true
-				// update rooms in client
-				client := h.clients[userRoomUpdate.userID]
 				client.roomIDs[userRoomUpdate.roomID] = true
 			} else {
-				// update rooms in hub
-				_, ok := h.rooms[userRoomUpdate.roomID]
-				if !ok {
+				if _, ok := h.rooms[userRoomUpdate.roomID]; !ok {
 					continue
 				}
-				delete(h.rooms, userRoomUpdate.roomID)
-				client := h.clients[userRoomUpdate.userID]
+				delete(h.rooms[userRoomUpdate.roomID], userRoomUpdate.userID)
 				delete(client.roomIDs, userRoomUpdate.roomID)
 			}
 		case broadcastMsg := <-h.broadcast:
