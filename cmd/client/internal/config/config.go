@@ -7,6 +7,7 @@ import "os"
 type Config struct {
 	ServerURL string
 	WSURL     string
+	Theme     string
 }
 
 // Load reads configuration from environment variables with sensible defaults.
@@ -14,6 +15,7 @@ func Load() Config {
 	return Config{
 		ServerURL: getenv("SERVER_URL", "http://localhost:8080"),
 		WSURL:     getenv("WS_URL", "ws://localhost:8080"),
+		Theme:     getenv("THEME", "catppuccin"),
 	}
 }
 

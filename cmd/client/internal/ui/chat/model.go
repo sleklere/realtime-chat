@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/api"
+	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/theme"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/ws"
 )
 
@@ -65,13 +66,13 @@ func New(
 	username, wsURL, token string,
 	width, height int,
 ) Model {
-	vp := viewport.New(width, height-5)
+	vp := viewport.New(width, height-4)
 
 	input := textinput.New()
 	input.Placeholder = "type a message..."
 	input.Focus()
 	input.CharLimit = 500
-	input.Width = width - 4
+	input.Width = width - 6
 
 	return Model{
 		apiClient: apiClient,
@@ -141,8 +142,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - 5
-		m.input.Width = msg.Width - 4
+		m.viewport.Height = msg.Height - 4
+		m.input.Width = msg.Width - 6
 		m.updateViewport()
 	}
 
@@ -160,37 +161,42 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 // View renders the chat model.
 func (m Model) View() string {
+	t := theme.Current
+
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("205")).
+		Foreground(t.Accent).
+		Padding(0, 1).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(lipgloss.Color("241")).
+		BorderForeground(t.Surface).
 		Width(m.width)
 
-	inputStyle := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, false, false, false).
-		BorderForeground(lipgloss.Color("241")).
-		Width(m.width)
+	inputBoxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(t.Surface).
+		Padding(0, 1).
+		Width(m.width - 2)
 
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
+	statusStyle := lipgloss.NewStyle().
+		Foreground(t.Subtle).
+		Italic(true)
 
 	var b strings.Builder
 
-	header := fmt.Sprintf(" #%s — %s", m.room.Slug, m.room.Name)
+	header := fmt.Sprintf("#%s  %s", m.room.Slug, lipgloss.NewStyle().Foreground(t.Subtle).Render(m.room.Name))
 	b.WriteString(headerStyle.Render(header))
 	b.WriteString("\n")
 	b.WriteString(m.viewport.View())
 	b.WriteString("\n")
-	b.WriteString(inputStyle.Render(" " + m.input.View()))
+	b.WriteString(inputBoxStyle.Render(m.input.View()))
 	b.WriteString("\n")
 
+	var statusParts []string
 	if m.err != "" {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		b.WriteString(errorStyle.Render(m.err))
-		b.WriteString(" ")
+		statusParts = append(statusParts, lipgloss.NewStyle().Foreground(t.Error).Render(m.err))
 	}
-
-	b.WriteString(helpStyle.Render("esc: leave room • enter: send"))
+	statusParts = append(statusParts, statusStyle.Render("esc: leave  enter: send"))
+	b.WriteString(strings.Join(statusParts, "  "))
 
 	return b.String()
 }
@@ -238,20 +244,22 @@ func (m Model) handleWSMessage(msg ws.IncomingMsg) (Model, tea.Cmd) {
 }
 
 func (m *Model) updateViewport() {
-	var lines []string
-	ownStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	timeStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	nameStyle := lipgloss.NewStyle().Bold(true)
+	t := theme.Current
+	ownStyle := lipgloss.NewStyle().Foreground(t.OwnMsg).Bold(true)
+	otherStyle := lipgloss.NewStyle().Foreground(t.OtherMsg).Bold(true)
+	timeStyle := lipgloss.NewStyle().Foreground(t.Subtle)
+	contentStyle := lipgloss.NewStyle().Foreground(t.Text)
 
+	var lines []string
 	for _, msg := range m.messages {
 		ts := timeStyle.Render(fmt.Sprintf("[%s]", msg.timestamp))
 		var name string
 		if msg.senderID == m.userID {
 			name = ownStyle.Render("you")
 		} else {
-			name = nameStyle.Render(msg.senderUsername)
+			name = otherStyle.Render(msg.senderUsername)
 		}
-		lines = append(lines, fmt.Sprintf("%s %s: %s", ts, name, msg.content))
+		lines = append(lines, fmt.Sprintf("%s %s: %s", ts, name, contentStyle.Render(msg.content)))
 	}
 
 	m.viewport.SetContent(strings.Join(lines, "\n"))

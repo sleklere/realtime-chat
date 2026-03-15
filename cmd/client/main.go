@@ -9,11 +9,13 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/config"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/ui"
+	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/theme"
 )
 
 func main() {
 	_ = godotenv.Load()
 	cfg := config.Load()
+	theme.Load(cfg.Theme)
 
 	logFile, err := os.OpenFile("client.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {

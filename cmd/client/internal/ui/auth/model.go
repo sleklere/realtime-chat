@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/api"
+	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/theme"
 )
 
 type mode int
@@ -103,6 +104,33 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 // View renders the auth model.
 func (m Model) View() string {
+	t := theme.Current
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(t.Accent)
+
+	formStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(t.Surface).
+		Padding(1, 3).
+		Width(50)
+
+	labelStyle := lipgloss.NewStyle().
+		Foreground(t.Subtle).
+		Bold(true)
+
+	errorStyle := lipgloss.NewStyle().
+		Foreground(t.Error)
+
+	helpStyle := lipgloss.NewStyle().
+		Foreground(t.Subtle).
+		Italic(true)
+
+	brandStyle := lipgloss.NewStyle().
+		Foreground(t.Gold).
+		Bold(true)
+
 	var title string
 	if m.mode == modeLogin {
 		title = "Login"
@@ -110,25 +138,23 @@ func (m Model) View() string {
 		title = "Register"
 	}
 
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205"))
-	formStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("205")).
-		Padding(1, 3)
-	errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Italic(true)
-
 	var b strings.Builder
 
+	b.WriteString(brandStyle.Render("realtime-chat"))
+	b.WriteString("\n\n")
 	b.WriteString(titleStyle.Render(title))
 	b.WriteString("\n\n")
+	b.WriteString(labelStyle.Render("Username"))
+	b.WriteString("\n")
 	b.WriteString(m.usernameInput.View())
+	b.WriteString("\n\n")
+	b.WriteString(labelStyle.Render("Password"))
 	b.WriteString("\n")
 	b.WriteString(m.passwordInput.View())
 	b.WriteString("\n\n")
 
 	if m.loading {
-		b.WriteString("Authenticating...")
+		b.WriteString(lipgloss.NewStyle().Foreground(t.Gold).Render("Authenticating..."))
 	} else if m.err != "" {
 		b.WriteString(errorStyle.Render(m.err))
 	}
@@ -141,7 +167,7 @@ func (m Model) View() string {
 	} else {
 		modeToggle = "Already have an account? ctrl+t to login"
 	}
-	b.WriteString(helpStyle.Render(fmt.Sprintf("%s • tab to switch fields • enter to submit", modeToggle)))
+	b.WriteString(helpStyle.Render(fmt.Sprintf("%s\ntab: switch fields  enter: submit", modeToggle)))
 
 	form := formStyle.Render(b.String())
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, form)
