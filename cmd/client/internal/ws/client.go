@@ -71,6 +71,23 @@ func (c *Client) Send(msg Message) {
 	c.sendCh <- msg
 }
 
+// SendDirectMessage sends a direct message to the specified user.
+func (c *Client) SendDirectMessage(toUserID int64, content string) error {
+	payload, err := json.Marshal(DirectMessagePayload{
+		ToUserID: toUserID,
+		Content:  content,
+	})
+	if err != nil {
+		return err
+	}
+
+	c.Send(Message{
+		Type:    TypeDirectMessage,
+		Payload: payload,
+	})
+	return nil
+}
+
 // SendRoomMessage sends a message to the specified room.
 func (c *Client) SendRoomMessage(roomID int64, content string) error {
 	payload, err := json.Marshal(RoomMessagePayload{

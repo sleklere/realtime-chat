@@ -9,6 +9,8 @@ import (
 	"github.com/sleklere/realtime-chat/cmd/client/internal/config"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/auth"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/chat"
+	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/dm"
+	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/dmchat"
 	"github.com/sleklere/realtime-chat/cmd/client/internal/ui/rooms"
 )
 
@@ -18,6 +20,8 @@ const (
 	screenAuth screen = iota
 	screenRooms
 	screenChat
+	screenDM
+	screenDMChat
 )
 
 // AppState holds shared state across UI screens.
@@ -39,9 +43,11 @@ type App struct {
 	width   int
 	height  int
 
-	auth  auth.Model
-	rooms rooms.Model
-	chat  chat.Model
+	auth   auth.Model
+	rooms  rooms.Model
+	chat   chat.Model
+	dm     dm.Model
+	dmChat dmchat.Model
 }
 
 // NewApp creates a new App with the given configuration and logger.
@@ -114,6 +120,57 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.active = screenRooms
 		a.rooms = rooms.New(a.state.APIClient, a.width, a.height)
 		return a, a.rooms.Init()
+
+	case rooms.ShowDMsMsg:
+		a.active = screenDM
+		a.dm = dm.New(a.state.APIClient, a.width, a.height)
+		return a, a.dm.Init()
+
+	case dm.ConvSelectedMsg:
+		a.active = screenDMChat
+		a.dmChat = dmchat.New(
+			a.state.APIClient,
+			a.program,
+			a.state.Logger,
+			msg.Conv.ID,
+			msg.Conv.PeerID,
+			msg.Conv.PeerUsername,
+			a.state.UserID,
+			a.state.Username,
+			a.state.Config.WSURL,
+			a.state.Token,
+			a.width,
+			a.height,
+		)
+		return a, a.dmChat.Init()
+
+	case dm.NewDMMsg:
+		a.active = screenDMChat
+		a.dmChat = dmchat.New(
+			a.state.APIClient,
+			a.program,
+			a.state.Logger,
+			0, // no conversation yet
+			msg.PeerID,
+			msg.PeerUsername,
+			a.state.UserID,
+			a.state.Username,
+			a.state.Config.WSURL,
+			a.state.Token,
+			a.width,
+			a.height,
+		)
+		return a, a.dmChat.Init()
+
+	case dm.LeaveDMListMsg:
+		a.active = screenRooms
+		a.rooms = rooms.New(a.state.APIClient, a.width, a.height)
+		return a, a.rooms.Init()
+
+	case dmchat.LeaveDMMsg:
+		a.active = screenDM
+		a.dm = dm.New(a.state.APIClient, a.width, a.height)
+		return a, a.dm.Init()
 	}
 
 	switch a.active {
@@ -129,6 +186,14 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		a.chat, cmd = a.chat.Update(msg)
 		return a, cmd
+	case screenDM:
+		var cmd tea.Cmd
+		a.dm, cmd = a.dm.Update(msg)
+		return a, cmd
+	case screenDMChat:
+		var cmd tea.Cmd
+		a.dmChat, cmd = a.dmChat.Update(msg)
+		return a, cmd
 	}
 
 	return a, nil
@@ -143,6 +208,10 @@ func (a *App) View() string {
 		return a.rooms.View()
 	case screenChat:
 		return a.chat.View()
+	case screenDM:
+		return a.dm.View()
+	case screenDMChat:
+		return a.dmChat.View()
 	}
 	return ""
 }

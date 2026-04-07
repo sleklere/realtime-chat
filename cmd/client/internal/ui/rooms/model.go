@@ -19,6 +19,9 @@ type RoomSelectedMsg struct {
 	Room api.RoomResponse
 }
 
+// ShowDMsMsg signals that the user wants to navigate to the DM screen.
+type ShowDMsMsg struct{}
+
 // RoomErrorMsg signals an error in room operations.
 type RoomErrorMsg struct {
 	Err error
@@ -143,6 +146,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				}
 			}
 			return m, nil
+		case "d":
+			return m, func() tea.Msg { return ShowDMsMsg{} }
 		case "r":
 			return m, m.fetchRooms()
 		case "enter":
@@ -215,7 +220,7 @@ func (m Model) View() string {
 	if m.pickingTheme {
 		b.WriteString(helpStyle.Render("j/k: navigate  enter: apply  esc: cancel"))
 	} else {
-		b.WriteString(helpStyle.Render("enter: join  n: new room  t: theme  r: refresh  esc: quit"))
+		b.WriteString(helpStyle.Render("enter: join  n: new room  d: DMs  t: theme  r: refresh  esc: quit"))
 	}
 
 	return b.String()

@@ -34,10 +34,18 @@ type RoomResponse struct {
 type MessageResponse struct {
 	ID             int64     `json:"id"`
 	RoomID         *int64    `json:"room_id,omitempty"`
+	ConversationID *int64    `json:"conversation_id,omitempty"`
 	SenderID       int64     `json:"sender_id"`
 	SenderUsername string    `json:"sender_username"`
 	Body           string    `json:"body"`
 	CreatedAt      time.Time `json:"created_at"`
+}
+
+// ConversationResponse represents a DM conversation in API responses.
+type ConversationResponse struct {
+	ID           int64  `json:"id"`
+	PeerID       int64  `json:"peer_id"`
+	PeerUsername string `json:"peer_username"`
 }
 
 // CreateRoomRequest represents the request body for creating a room.
