@@ -50,14 +50,14 @@ type DirectMessagePayload struct {
 	ToUserID int64  `json:"to_user_id"`
 	Content  string `json:"content"`
 	// fields populated by the server before broadcast
-	FromUserID     int64  `json:"from_user_id,omitempty"`
-	FromUsername   string `json:"from_username,omitempty"`
+	SenderID       int64  `json:"from_user_id,omitempty"`
+	SenderUsername string `json:"from_username,omitempty"`
 	ConversationID int64  `json:"conversation_id,omitempty"`
 	MessageID      int64  `json:"message_id,omitempty"`
 }
 
-// JoinRoomPayload is the payload for join/leave room events.
-type JoinRoomPayload struct {
+// RoomPresencePayload is the payload for join/leave room events.
+type RoomPresencePayload struct {
 	RoomID int64 `json:"room_id"`
 }
 

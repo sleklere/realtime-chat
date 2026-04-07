@@ -62,70 +62,85 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <-h.register:
-			for roomID, isInRoom := range client.roomIDs {
-				_, ok := h.rooms[roomID]
-				if !ok {
-					h.rooms[roomID] = make(map[int64]bool)
-				}
-				h.rooms[roomID][client.userID] = isInRoom
-			}
-			h.clients[client.userID] = client
+			h.registerClient(client)
 		case client := <-h.unregister:
-			for roomID := range client.roomIDs {
-				_, ok := h.rooms[roomID]
-				if !ok {
-					continue
-				}
-				delete(h.rooms[roomID], client.userID)
-			}
-			delete(h.clients, client.userID)
-			close(client.send)
+			h.unregisterClient(client)
 		case userRoomUpdate := <-h.userRoomUpdate:
-			client, ok := h.clients[userRoomUpdate.userID]
-			if !ok {
+			h.updateUserPresenceInRoom(userRoomUpdate)
+		case broadcastMsg := <-h.broadcast:
+			h.broadcastMessage(broadcastMsg)
+		}
+	}
+}
+
+func (h *Hub) registerClient(c *Client) {
+	for roomID, isInRoom := range c.roomIDs {
+		if _, ok := h.rooms[roomID]; !ok {
+			h.rooms[roomID] = make(map[int64]bool)
+		}
+		h.rooms[roomID][c.userID] = isInRoom
+	}
+	h.clients[c.userID] = c
+}
+
+func (h *Hub) unregisterClient(c *Client) {
+	for roomID := range c.roomIDs {
+		_, ok := h.rooms[roomID]
+		if !ok {
+			continue
+		}
+		delete(h.rooms[roomID], c.userID)
+	}
+	delete(h.clients, c.userID)
+	close(c.send)
+}
+
+func (h *Hub) updateUserPresenceInRoom(userRoomUpdate UserRoomPresent) {
+	client, ok := h.clients[userRoomUpdate.userID]
+	if !ok {
+		return
+	}
+	if userRoomUpdate.present {
+		if _, ok := h.rooms[userRoomUpdate.roomID]; !ok {
+			h.rooms[userRoomUpdate.roomID] = make(map[int64]bool)
+		}
+		h.rooms[userRoomUpdate.roomID][userRoomUpdate.userID] = true
+		client.roomIDs[userRoomUpdate.roomID] = true
+	} else {
+		if _, ok := h.rooms[userRoomUpdate.roomID]; !ok {
+			return
+		}
+		delete(h.rooms[userRoomUpdate.roomID], userRoomUpdate.userID)
+		delete(client.roomIDs, userRoomUpdate.roomID)
+	}
+}
+
+func (h *Hub) broadcastMessage(broadcastMsg BroadcastMsg) {
+	// if it's a room msg
+	if broadcastMsg.targetRoomID > 0 {
+		for userID, isConnected := range h.rooms[broadcastMsg.targetRoomID] {
+			if !isConnected {
 				continue
 			}
-			if userRoomUpdate.present {
-				if _, ok := h.rooms[userRoomUpdate.roomID]; !ok {
-					h.rooms[userRoomUpdate.roomID] = make(map[int64]bool)
-				}
-				h.rooms[userRoomUpdate.roomID][userRoomUpdate.userID] = true
-				client.roomIDs[userRoomUpdate.roomID] = true
-			} else {
-				if _, ok := h.rooms[userRoomUpdate.roomID]; !ok {
-					continue
-				}
-				delete(h.rooms[userRoomUpdate.roomID], userRoomUpdate.userID)
-				delete(client.roomIDs, userRoomUpdate.roomID)
+			c := h.clients[userID]
+			select {
+			case c.send <- broadcastMsg.msg:
+			default:
+				// client laggeado, lo sacamos
+				h.kickClient(c)
 			}
-		case broadcastMsg := <-h.broadcast:
-			// if it's a room msg
-			if broadcastMsg.targetRoomID > 0 {
-				for userID, isConnected := range h.rooms[broadcastMsg.targetRoomID] {
-					if !isConnected {
-						continue
-					}
-					c := h.clients[userID]
-					select {
-					case c.send <- broadcastMsg.msg:
-					default:
-						// client laggeado, lo sacamos
-						h.kickClient(c)
-					}
+		}
+	} else {
+		for _, userID := range broadcastMsg.targetUserIDs {
+			// if the client exists
+			if c, ok := h.clients[userID]; ok {
+				select {
+				case c.send <- broadcastMsg.msg:
+				default:
+					// client laggeado, lo sacamos
+					h.kickClient(c)
 				}
-			} else {
-				for _, userID := range broadcastMsg.targetUserIDs {
-					// if the client exists
-					if c, ok := h.clients[userID]; ok {
-						select {
-						case c.send <- broadcastMsg.msg:
-						default:
-							// client laggeado, lo sacamos
-							h.kickClient(c)
-						}
 
-					}
-				}
 			}
 		}
 	}

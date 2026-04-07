@@ -4,8 +4,8 @@
 *.dll
 *.so
 *.dylib
-client
-server
+/client
+/server
 
 # Test artifacts
 *.test

@@ -10,6 +10,20 @@ import (
 	dbstore "github.com/sleklere/realtime-chat/cmd/server/internal/store"
 )
 
+// NewClient creates a new Client ready to be registered with the Hub.
+func NewClient(hub *Hub, conn *websocket.Conn, queries *dbstore.Queries, userID int64, username string, roomIDs map[int64]bool, logger *slog.Logger) *Client {
+	return &Client{
+		hub:      hub,
+		conn:     conn,
+		queries:  queries,
+		userID:   userID,
+		username: username,
+		roomIDs:  roomIDs,
+		logger:   logger,
+		send:     make(chan Message, 256),
+	}
+}
+
 // ReadPump reads messages from the WebSocket and routes them to the Hub.
 func (c *Client) ReadPump(ctx context.Context) {
 	defer func() {
@@ -30,8 +44,15 @@ func (c *Client) ReadPump(ctx context.Context) {
 			c.logger.Warn("error while unmarshalling ws msg data")
 			continue
 		}
-		// 3. switch msg.Type — por ahora solo manejá TypeRoomMessage
-		c.dispatchWSMessage(msg, ctx)
+		// 3. switch msg.Type
+		switch msg.Type {
+		case TypeRoomMessage:
+			c.dispatchRoomMessage(msg, ctx)
+		case TypeDirectMessage:
+			c.dispatchDirectMessage(msg, ctx)
+		case TypeJoinRoom, TypeLeaveRoom:
+			c.dispatchUserRoomUpdate(msg, ctx)
+		}
 	}
 }
 
@@ -60,60 +81,98 @@ func (c *Client) WritePump(ctx context.Context) {
 	}
 }
 
-func (c *Client) dispatchWSMessage(msg Message, ctx context.Context) {
-	switch msg.Type {
-	case TypeRoomMessage:
-		//    - parsear el RoomMessagePayload del msg.Payload
-		var roomMsgPayload RoomMessagePayload
-		err := json.Unmarshal(msg.Payload, &roomMsgPayload)
-		if err != nil {
-			c.logger.Warn("error while unmarshalling msg payload")
-			return
-		}
-		//    - validar (roomID > 0, content no vacío, que el client sea miembro del room)
-		_, clientInRoom := c.roomIDs[roomMsgPayload.RoomID]
-		if roomMsgPayload.RoomID == 0 || roomMsgPayload.Content == "" ||
-			!clientInRoom {
-			c.logger.Warn("failed TypeRoomMessage validation", "room_id", roomMsgPayload.RoomID)
-			return
-		}
-		//    - persist to DB and broadcast
-		roomMsgPayload.SenderID = c.userID
-		roomMsgPayload.SenderUsername = c.username
-
-		dbMsg, err := c.queries.CreateMessage(ctx, dbstore.CreateMessageParams{
-			RoomID:   pgtype.Int8{Int64: roomMsgPayload.RoomID, Valid: true},
-			SenderID: c.userID,
-			Body:     roomMsgPayload.Content,
-		})
-		if err != nil {
-			c.logger.Warn("failed to persist room message", "error", err)
-		} else {
-			roomMsgPayload.MessageID = dbMsg.ID
-		}
-
-		completePayload, err := json.Marshal(roomMsgPayload)
-		if err != nil {
-			c.logger.Warn("error while marshalling complete msg payload")
-			return
-		}
-		msgWithCompletePayload := Message{Type: msg.Type, Payload: completePayload, Timestamp: msg.Timestamp}
-
-		broadcastMsg := BroadcastMsg{msg: msgWithCompletePayload, targetRoomID: roomMsgPayload.RoomID}
-		c.hub.broadcast <- broadcastMsg
+func (c *Client) dispatchRoomMessage(msg Message, ctx context.Context) {
+	//    - parsear el RoomMessagePayload del msg.Payload
+	var roomMsgPayload RoomMessagePayload
+	err := json.Unmarshal(msg.Payload, &roomMsgPayload)
+	if err != nil {
+		c.logger.Warn("error while unmarshalling room msg payload")
+		return
 	}
+	//    - validar (roomID > 0, content no vacío, que el client sea miembro del room)
+	_, clientInRoom := c.roomIDs[roomMsgPayload.RoomID]
+	if roomMsgPayload.RoomID == 0 || roomMsgPayload.Content == "" ||
+		!clientInRoom {
+		c.logger.Warn("failed TypeRoomMessage validation", "room_id", roomMsgPayload.RoomID)
+		return
+	}
+	//    - persist to DB and broadcast
+	roomMsgPayload.SenderID = c.userID
+	roomMsgPayload.SenderUsername = c.username
+
+	dbMsg, err := c.queries.CreateMessage(ctx, dbstore.CreateMessageParams{
+		RoomID:   pgtype.Int8{Int64: roomMsgPayload.RoomID, Valid: true},
+		SenderID: c.userID,
+		Body:     roomMsgPayload.Content,
+	})
+	if err != nil {
+		c.logger.Warn("failed to persist room message", "error", err)
+	} else {
+		roomMsgPayload.MessageID = dbMsg.ID
+	}
+
+	completePayload, err := json.Marshal(roomMsgPayload)
+	if err != nil {
+		c.logger.Warn("error while marshalling complete msg payload")
+		return
+	}
+	msgWithCompletePayload := Message{Type: msg.Type, Payload: completePayload, Timestamp: msg.Timestamp}
+
+	broadcastMsg := BroadcastMsg{msg: msgWithCompletePayload, targetRoomID: roomMsgPayload.RoomID}
+	c.hub.broadcast <- broadcastMsg
 }
 
-// NewClient creates a new Client ready to be registered with the Hub.
-func NewClient(hub *Hub, conn *websocket.Conn, queries *dbstore.Queries, userID int64, username string, roomIDs map[int64]bool, logger *slog.Logger) *Client {
-	return &Client{
-		hub:      hub,
-		conn:     conn,
-		queries:  queries,
-		userID:   userID,
-		username: username,
-		roomIDs:  roomIDs,
-		logger:   logger,
-		send:     make(chan Message, 256),
+func (c *Client) dispatchDirectMessage(msg Message, ctx context.Context) {
+	var directMsgPayload DirectMessagePayload
+	err := json.Unmarshal(msg.Payload, &directMsgPayload)
+	if err != nil {
+		c.logger.Warn("error while unmarshalling direct msg payload")
+		return
 	}
+
+	if directMsgPayload.ToUserID == 0 || directMsgPayload.Content == "" {
+		c.logger.Warn("failed TypeRoomMessage validation", "room_id", directMsgPayload.ConversationID)
+		return
+	}
+
+	directMsgPayload.SenderID = c.userID
+	directMsgPayload.SenderUsername = c.username
+
+	dbMsg, err := c.queries.CreateDirectMessage(ctx, dbstore.CreateDirectMessageParams{
+		SenderID: c.userID,
+		ToUserID: directMsgPayload.ToUserID,
+		Body:     directMsgPayload.Content,
+	})
+	if err != nil {
+		c.logger.Warn("failed to persist dm message", "error", err)
+	} else {
+		directMsgPayload.MessageID = dbMsg.ID
+	}
+
+	completePayload, err := json.Marshal(directMsgPayload)
+	if err != nil {
+		c.logger.Warn("error while marshalling complete msg payload")
+		return
+	}
+	msgWithCompletePayload := Message{Type: msg.Type, Payload: completePayload, Timestamp: msg.Timestamp}
+
+	broadcastMsg := BroadcastMsg{msg: msgWithCompletePayload, targetUserIDs: []int64{c.userID, directMsgPayload.ToUserID}}
+	c.hub.broadcast <- broadcastMsg
+}
+
+func (c *Client) dispatchUserRoomUpdate(msg Message, ctx context.Context) {
+
+	var roomPresencePayload RoomPresencePayload
+	err := json.Unmarshal(msg.Payload, &roomPresencePayload)
+	if err != nil {
+		c.logger.Warn("error while unmarshalling JoinRoomPayload")
+		return
+	}
+
+	if roomPresencePayload.RoomID <= 0 {
+		c.logger.Warn("invalid room ID")
+		return
+	}
+
+	c.hub.updateUserPresenceInRoom(UserRoomPresent{userID: c.userID, roomID: roomPresencePayload.RoomID, present: msg.Type == TypeJoinRoom})
 }
