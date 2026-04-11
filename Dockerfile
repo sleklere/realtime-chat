@@ -7,11 +7,11 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
-RUN CGO_ENABLED=0 go build -o /bin/server ./cmd/server
-
 # Install goose for migrations
 RUN go install github.com/pressly/goose/v3/cmd/goose@v3.24.1
+
+COPY . .
+RUN CGO_ENABLED=0 go build -o /bin/server ./cmd/server
 
 # Runtime stage
 FROM alpine:3.21
